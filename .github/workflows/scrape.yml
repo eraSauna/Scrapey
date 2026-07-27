@@ -29,8 +29,9 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
           python -m playwright install --with-deps chromium
+          sudo apt-get update && sudo apt-get install -y xvfb
 
-      - name: Draai scraper
+      - name: Draai scraper (headed via xvfb)
         env:
           PROXY_URL: ${{ secrets.PROXY_URL }}
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
@@ -39,7 +40,8 @@ jobs:
           export TARGET_DATE="$(TZ=Europe/Amsterdam date +%F)"
           export RUN_LABEL="$(TZ=Europe/Amsterdam date +%H:%M)"
           echo "Datum $TARGET_DATE, run $RUN_LABEL"
-          python scrape.py
+          # Bookeo blokkeert headless -> headed browser onder een virtueel scherm (xvfb)
+          xvfb-run -a python scrape.py
 
       - name: Bewaar debug-output (indien aanwezig)
         if: always()

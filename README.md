@@ -5,15 +5,18 @@ aantal **beschikbare plekken** per tijdslot — en schrijft dat naar **Supabase*
 Reserveringen, bezetting % en omzet worden berekend in een SQL-view
 (reserveringen = max personen − beschikbaar).
 
-Draait op GitHub Actions (gratis) via een **residentiële proxy**, omdat Bookeo
-datacenter- en geflagde IP's blokkeert.
+Draait op GitHub Actions (gratis) via een **residentiële proxy** (Bookeo blokkeert
+datacenter/geflagde IP's) en in een **headed** browser onder xvfb (Bookeo blokkeert
+headless browsers met een "session inactive"-fout).
 
 ## Wat jij moet aanmaken
 
 ### 1. Residentiële proxy → secret `PROXY_URL`
-- Neem een **residentiële** proxy (géén datacenter): bv. IPRoyal, Decodo/Smartproxy, Oxylabs.
+- Neem een **residentiële** proxy (géén datacenter): bv. IPRoyal.
 - Pay-as-you-go of klein pakket; ons verbruik is ~5–10 MB/dag.
-- Vorm: `http://GEBRUIKER:WACHTWOORD@HOST:POORT` (kies NL/EU).
+- Vorm: `http://GEBRUIKER:WACHTWOORD@HOST:POORT` — de kale creds volstaan.
+  Voor IPRoyal voegt de scraper zelf NL-geo + een sticky sessie toe
+  (`_country-nl_session-…_lifetime-30m`), nodig omdat de Bookeo-sessie aan één IP hangt.
 
 ### 2. Apart (gratis) Supabase-project → secrets `SUPABASE_URL` en `SUPABASE_KEY`
 1. Maak een **nieuw, los** Supabase-account/organisatie aan (free tier). Niet je REPP-org.
@@ -61,6 +64,9 @@ de winter 1 uur. Wil je dat exact houden: in de winter cron op `0 2 * * *` en `0
 - `locations.py` — 9 locaties met Bookeo-id's, tijdslots, prijs, capaciteit
 - `.github/workflows/scrape.yml` — de 2×/dag cron
 
-## Nog te finaliseren
-De tekst-parser voor de slots is getest op de bekende opmaak, maar wordt na de **eerste
-echte proxy-run** (met de `debug/`-output) definitief afgesteld op de live DOM.
+## Werking (gevalideerd)
+- Getest via een NL residentiële proxy: alle 3 de Bookeo-accounts leveren correcte slots.
+- Bookeo toont per pagina de **huidige dag**; de 03:00-run vangt de volledige dag, de
+  12:00-run werkt de nog-open slots bij (upsert overschrijft alleen wat opnieuw gemeten is).
+- Per locatie 1 automatische retry bij een transiënte hapering; volgorde en pauzes zijn
+  gerandomiseerd (menselijk gedrag).
