@@ -3,22 +3,23 @@
 Kuuma bezetting-scraper.
 
 Leest per locatie de Bookeo-widget uit (aantal BESCHIKBARE plekken per tijdslot)
-en schrijft dat naar een Google Sheet. Draait via een residentiele proxy om de
-IP-blokkade van Bookeo te omzeilen.
+en schrijft dat naar Supabase. Draait via een residentiele proxy om de
+IP-blokkade van Bookeo te omzeilen. Gedrag is bewust rustig en menselijk
+(sequentieel, willekeurige volgorde en pauzes, bot-maskering).
 
 Config (env vars):
   PROXY_URL      http://user:pass@host:poort   (residentiele proxy; verplicht in de cloud)
-  SHEET_ID       Google Sheet id                (leeg = niet naar Sheets schrijven)
-  GCP_SA_KEY     JSON van de service-account    (of pad via GCP_SA_KEY_FILE)
+  SUPABASE_URL   https://xxxx.supabase.co       (leeg = niet schrijven, alleen JSON printen)
+  SUPABASE_KEY   service_role-key
   TARGET_DATE    YYYY-MM-DD  (default: vandaag in Europe/Amsterdam)
   ONLY           komma-lijst van locatie-keys (default: alle)
   DEBUG          "1" -> sla per locatie de frame-HTML op in ./debug/
-  RUN_LABEL      vrij label (bv. "03:00" / "12:00") -> tijdstempel in de sheet
+  RUN_LABEL      vrij label (bv. "03:00" / "12:00") -> tijdstempel
 
-Lokaal testen (zonder Sheets):
+Lokaal testen (zonder Supabase):
   PROXY_URL=... DEBUG=1 ONLY=ams-bjork ./venv/bin/python scrape.py
 """
-import os, re, sys, json, time, datetime, pathlib, traceback
+import os, re, sys, json, time, random, datetime, pathlib, traceback
 
 from playwright.sync_api import sync_playwright
 from locations import LOCATIONS, page_url
@@ -123,7 +124,7 @@ def scrape_location(context, loc, target_date, debug=False):
         frame = None
         text = ""
         for _ in range(16):  # tot ~40s wachten op slots
-            page.wait_for_timeout(2500)
+            page.wait_for_timeout(random.randint(2000, 3300))  # menselijke, wisselende wachttijd
             frame = find_booking_frame(page)
             if not frame:
                 continue
@@ -158,6 +159,7 @@ def scrape_location(context, loc, target_date, debug=False):
         res["slots"] = parse_slots_from_text(text or "")
         if not res["slots"]:
             res["error"] = "geen slots herkend (selectors nog te finaliseren op echte DOM)"
+        page.wait_for_timeout(random.randint(700, 1900))  # korte 'lees'-pauze zoals een mens
         return res
     except Exception as e:
         res["error"] = f"{type(e).__name__}: {e}"
@@ -185,21 +187,31 @@ def main():
     locs = [l for l in LOCATIONS if (not only or l["key"] in only)]
     print(f"== Kuuma scraper == datum={target} locaties={len(locs)} proxy={'ja' if proxy else 'NEE'} supabase={'ja' if to_supabase else 'nee'}")
 
+    # willekeurige volgorde: geen identiek patroon elke run
+    random.shuffle(locs)
+
     results = []
     with sync_playwright() as p:
-        browser = p.chromium.launch(headless=True, proxy=proxy)
+        browser = p.chromium.launch(headless=True, proxy=proxy, args=["--disable-blink-features=AutomationControlled"])
         context = browser.new_context(
             viewport={"width": 1280, "height": 1600},
             user_agent=("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
                         "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36"),
             locale="nl-NL",
+            timezone_id="Europe/Amsterdam",
+            extra_http_headers={"Accept-Language": "nl-NL,nl;q=0.9,en;q=0.8"},
         )
-        for loc in locs:
+        # bot-maskering: verberg navigator.webdriver
+        context.add_init_script("Object.defineProperty(navigator,'webdriver',{get:()=>undefined});")
+        for i, loc in enumerate(locs):
             r = scrape_location(context, loc, target, debug=debug)
             status = r["error"] or f"{len(r['slots'])} slots"
             print(f"  - {loc['naam']:22} {status}")
             results.append(r)
-            time.sleep(4)  # rustig aan; gentler op Bookeo/proxy
+            if i < len(locs) - 1:
+                pauze = random.uniform(7, 16)   # menselijke, wisselende pauze tussen locaties
+                print(f"    (pauze {pauze:.0f}s)")
+                time.sleep(pauze)
         browser.close()
 
     # naar Supabase
