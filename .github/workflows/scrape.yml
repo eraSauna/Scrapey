@@ -1,0 +1,50 @@
+name: Kuuma bezetting scraper
+
+on:
+  workflow_dispatch:        # handmatig starten (voor testen)
+  schedule:
+    # GitHub-cron draait in UTC. 01:00 UTC = 03:00 Amsterdam (zomertijd),
+    # 10:00 UTC = 12:00 Amsterdam (zomertijd). In wintertijd schuift dit 1 uur;
+    # zie README als je dat exact wilt houden.
+    - cron: "0 1 * * *"
+    - cron: "0 10 * * *"
+
+concurrency:
+  group: kuuma-scraper
+  cancel-in-progress: false
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Installeer dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          python -m playwright install --with-deps chromium
+
+      - name: Draai scraper
+        env:
+          PROXY_URL: ${{ secrets.PROXY_URL }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+        run: |
+          export TARGET_DATE="$(TZ=Europe/Amsterdam date +%F)"
+          export RUN_LABEL="$(TZ=Europe/Amsterdam date +%H:%M)"
+          echo "Datum $TARGET_DATE, run $RUN_LABEL"
+          python scrape.py
+
+      - name: Bewaar debug-output (indien aanwezig)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: debug
+          path: debug/
+          if-no-files-found: ignore
