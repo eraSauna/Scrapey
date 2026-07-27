@@ -75,3 +75,33 @@ select
 from public.bezetting_dag
 group by datum
 order by datum;
+
+-- 5) Cumulatief per locatie (voor het dashboard: wat heeft elke sauna gedraaid).
+create or replace view public.bezetting_locatie_totaal as
+select
+    location_key,
+    locatie,
+    count(distinct datum)                                as dagen_gemeten,
+    min(datum)                                           as eerste_dag,
+    max(datum)                                           as laatste_dag,
+    sum(max_capaciteit - beschikbaar)                    as reserveringen,
+    round(sum((max_capaciteit - beschikbaar) * prijs), 2) as omzet,
+    round(
+        sum(max_capaciteit - beschikbaar)::numeric
+        / nullif(sum(max_capaciteit), 0), 3)             as bezetting
+from public.slot_beschikbaarheid
+group by location_key, locatie;
+
+-- 6) Per locatie + tijdslot (welke slots lopen vol).
+create or replace view public.bezetting_per_slot as
+select
+    location_key,
+    locatie,
+    slot_time,
+    count(distinct datum)                                                 as dagen,
+    round(avg(max_capaciteit - beschikbaar), 2)                           as gem_reserveringen,
+    round(avg((max_capaciteit - beschikbaar)::numeric
+              / nullif(max_capaciteit, 0)), 3)                            as gem_bezetting
+from public.slot_beschikbaarheid
+group by location_key, locatie, slot_time
+order by location_key, slot_time;
