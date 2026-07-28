@@ -1,6 +1,6 @@
 # Kuuma bezetting-scraper
 
-Leest 2× per dag (03:00 en 12:00 Amsterdam) per locatie de Bookeo-widget uit — het
+Leest 3× per dag (06:00, 12:00 en 17:00 Amsterdam) per locatie de Bookeo-widget uit — het
 aantal **beschikbare plekken** per tijdslot — en schrijft dat naar **Supabase**.
 Reserveringen, bezetting % en omzet worden berekend in een SQL-view
 (reserveringen = max personen − beschikbaar).
@@ -33,6 +33,7 @@ headless browsers met een "session inactive"-fout).
 - **Private** repo onder je eigen account; zet de inhoud van deze map erin.
 - **Settings → Secrets and variables → Actions → New repository secret**:
   - `PROXY_URL`
+  - `HC_PING_URL` (optioneel) = healthchecks.io ping-URL voor storingsmail; leeg = uit
   - `SUPABASE_URL`
   - `SUPABASE_KEY`
 

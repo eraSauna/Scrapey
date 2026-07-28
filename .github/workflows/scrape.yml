@@ -3,9 +3,9 @@ name: Kuuma bezetting scraper
 on:
   workflow_dispatch:        # handmatig starten (voor testen)
   schedule:
-    # GitHub-cron draait in UTC (zomertijd): 01:00=03:00, 10:00=12:00, 15:00=17:00 Amsterdam.
+    # GitHub-cron draait in UTC (zomertijd): 04:00=06:00, 10:00=12:00, 15:00=17:00 Amsterdam.
     # In wintertijd schuift dit 1 uur; zie README als je dat exact wilt houden.
-    - cron: "0 1 * * *"    # ochtend — hele dag
+    - cron: "0 4 * * *"    # ochtend — hele dag
     - cron: "0 10 * * *"   # middag — update
     - cron: "0 15 * * *"   # avond — completere eindstand
 
@@ -17,6 +17,8 @@ jobs:
   scrape:
     runs-on: ubuntu-latest
     timeout-minutes: 25
+    env:
+      HC_PING_URL: ${{ secrets.HC_PING_URL }}   # healthchecks.io ping-URL (leeg = uit)
     steps:
       - uses: actions/checkout@v4
 
@@ -39,7 +41,7 @@ jobs:
         run: |
           export TARGET_DATE="$(TZ=Europe/Amsterdam date +%F)"
           H="$(TZ=Europe/Amsterdam date +%H)"
-          # stabiel meetmoment: 03:00='ochtend' (hele dag), 12:00='middag', 17:00='avond' (update).
+          # stabiel meetmoment: 06:00='ochtend' (hele dag), 12:00='middag', 17:00='avond' (update).
           # Alleen 'ochtend' legt de vooraf-stand vast; middag/avond werken de laatste stand bij.
           if [ "$H" -lt 8 ]; then export RUN_LABEL="ochtend";
           elif [ "$H" -lt 15 ]; then export RUN_LABEL="middag";
@@ -47,6 +49,14 @@ jobs:
           echo "Datum $TARGET_DATE, meetmoment $RUN_LABEL ($(TZ=Europe/Amsterdam date +%H:%M))"
           # Bookeo blokkeert headless -> headed browser onder een virtueel scherm (xvfb)
           xvfb-run -a python scrape.py
+
+      - name: Healthcheck OK
+        if: success() && env.HC_PING_URL != ''
+        run: curl -fsS --max-time 15 --retry 3 "${HC_PING_URL%/}" || true
+
+      - name: Healthcheck FAIL (mailt bij storing)
+        if: failure() && env.HC_PING_URL != ''
+        run: curl -fsS --max-time 15 --retry 3 "${HC_PING_URL%/}/fail" || true
 
       - name: Bewaar debug-output (indien aanwezig)
         if: always()
