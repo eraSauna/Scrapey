@@ -38,8 +38,10 @@ jobs:
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
         run: |
           export TARGET_DATE="$(TZ=Europe/Amsterdam date +%F)"
-          export RUN_LABEL="$(TZ=Europe/Amsterdam date +%H:%M)"
-          echo "Datum $TARGET_DATE, run $RUN_LABEL"
+          H="$(TZ=Europe/Amsterdam date +%H)"
+          # stabiel meetmoment: nachtrun = 'ochtend' (volledige dag), middagrun = 'middag' (update)
+          if [ "$H" -lt 8 ]; then export RUN_LABEL="ochtend"; else export RUN_LABEL="middag"; fi
+          echo "Datum $TARGET_DATE, meetmoment $RUN_LABEL ($(TZ=Europe/Amsterdam date +%H:%M))"
           # Bookeo blokkeert headless -> headed browser onder een virtueel scherm (xvfb)
           xvfb-run -a python scrape.py
 

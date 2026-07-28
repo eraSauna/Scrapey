@@ -35,7 +35,8 @@ create table if not exists public.slot_beschikbaarheid (
     locatie        text        not null,
     datum          date        not null,
     slot_time      text        not null,      -- bv. "07:00"
-    beschikbaar    int         not null,      -- wat de site toont (0 = vol)
+    beschikbaar    int         not null,      -- laatste stand die de site toont (0 = vol)
+    beschikbaar_ochtend int,                   -- stand bij de 03:00-run (blijft staan; middag overschrijft niet)
     max_capaciteit int         not null,      -- max personen drop-in op moment van meten
     prijs          numeric     not null,
     run_label      text,                       -- "03:00" / "12:00"
@@ -60,10 +61,12 @@ select
         / nullif(sum(max_capaciteit), 0), 3)             as bezetting,
     round(
         sum((max_capaciteit - beschikbaar) * prijs), 2)  as omzet,
-    max(scraped_at)                                      as laatst_bijgewerkt
+    max(scraped_at)                                      as laatst_bijgewerkt,
+    -- stand zoals gemeten om 03:00 (voornamelijk vooraf geboekt)
+    sum(max_capaciteit - coalesce(beschikbaar_ochtend, beschikbaar))                     as reserveringen_ochtend,
+    round(sum((max_capaciteit - coalesce(beschikbaar_ochtend, beschikbaar)) * prijs), 2) as omzet_ochtend
 from public.slot_beschikbaarheid
-group by location_key, locatie, datum
-order by datum, locatie;
+group by location_key, locatie, datum;
 
 -- 4) Totaal per dag over alle locaties.
 create or replace view public.bezetting_totaal as

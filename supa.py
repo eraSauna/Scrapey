@@ -14,6 +14,7 @@ def _by_key(key):
 
 
 def build_rows(results, target, run_label):
+    ochtend = (run_label or "").lower().startswith("ochtend")
     rows = []
     for r in results:
         if r.get("error") or not r.get("slots"):
@@ -22,7 +23,7 @@ def build_rows(results, target, run_label):
         if not loc:
             continue
         for s in r["slots"]:
-            rows.append({
+            row = {
                 "location_key": loc["key"],
                 "locatie": loc["naam"],
                 "datum": target.isoformat(),
@@ -31,7 +32,12 @@ def build_rows(results, target, run_label):
                 "max_capaciteit": loc["maxdrop"],
                 "prijs": loc["prijs"],
                 "run_label": run_label,
-            })
+            }
+            # Alleen bij de ochtendrun de 03:00-stand vastleggen. De middagrun laat dit
+            # veld weg, zodat de upsert de ochtendwaarde niet overschrijft.
+            if ochtend:
+                row["beschikbaar_ochtend"] = s["available"]
+            rows.append(row)
     return rows
 
 
