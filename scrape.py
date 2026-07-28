@@ -56,14 +56,17 @@ def build_proxy():
     return d
 
 
-def goto_retry(page, url, n=5):
+def goto_retry(page, url, n=4):
+    # Residentiele proxy hapert soms (tunnel/connectie/proxy-auth). Opnieuw proberen
+    # met oplopende wachttijd; bij een vers context+IP (zie main) lukt het meestal wel.
+    last = None
     for k in range(n):
         try:
             return page.goto(url, wait_until="domcontentloaded", timeout=45000)
         except Exception as e:
-            if "PROXY_AUTH" in str(e) and k < n - 1:
-                time.sleep(2 + k); continue
-            raise
+            last = e
+            time.sleep(2 + 2 * k)
+    raise last
 
 
 # ---------------------------------------------------------------- parsing
@@ -209,12 +212,13 @@ def main():
             args=["--no-sandbox", "--disable-blink-features=AutomationControlled"],
         )
         for i, loc in enumerate(locs):
-            r = scrape_location(browser, proxy, loc, target, debug=debug)
-            if r["error"] or not r["slots"]:          # 1x opnieuw bij transiente hapering
+            # Vers proxy-IP per locatie; en bij hapering nog 2 pogingen met telkens een nieuw IP.
+            r = scrape_location(browser, build_proxy(), loc, target, debug=debug)
+            for _ in range(2):
+                if not r["error"] and r["slots"]:
+                    break
                 time.sleep(random.uniform(3, 6))
-                r2 = scrape_location(browser, proxy, loc, target, debug=debug)
-                if not r2["error"] and r2["slots"]:
-                    r = r2
+                r = scrape_location(browser, build_proxy(), loc, target, debug=debug)
             print(f"  - {loc['naam']:22} {r['error'] or str(len(r['slots']))+' slots '+(r['displayed_date'] or '')}")
             results.append(r)
             if i < len(locs) - 1:
