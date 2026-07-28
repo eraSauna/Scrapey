@@ -3,11 +3,11 @@ name: Kuuma bezetting scraper
 on:
   workflow_dispatch:        # handmatig starten (voor testen)
   schedule:
-    # GitHub-cron draait in UTC. 01:00 UTC = 03:00 Amsterdam (zomertijd),
-    # 10:00 UTC = 12:00 Amsterdam (zomertijd). In wintertijd schuift dit 1 uur;
-    # zie README als je dat exact wilt houden.
-    - cron: "0 1 * * *"
-    - cron: "0 10 * * *"
+    # GitHub-cron draait in UTC (zomertijd): 01:00=03:00, 10:00=12:00, 15:00=17:00 Amsterdam.
+    # In wintertijd schuift dit 1 uur; zie README als je dat exact wilt houden.
+    - cron: "0 1 * * *"    # ochtend — hele dag
+    - cron: "0 10 * * *"   # middag — update
+    - cron: "0 15 * * *"   # avond — completere eindstand
 
 concurrency:
   group: kuuma-scraper
@@ -39,8 +39,11 @@ jobs:
         run: |
           export TARGET_DATE="$(TZ=Europe/Amsterdam date +%F)"
           H="$(TZ=Europe/Amsterdam date +%H)"
-          # stabiel meetmoment: nachtrun = 'ochtend' (volledige dag), middagrun = 'middag' (update)
-          if [ "$H" -lt 8 ]; then export RUN_LABEL="ochtend"; else export RUN_LABEL="middag"; fi
+          # stabiel meetmoment: 03:00='ochtend' (hele dag), 12:00='middag', 17:00='avond' (update).
+          # Alleen 'ochtend' legt de vooraf-stand vast; middag/avond werken de laatste stand bij.
+          if [ "$H" -lt 8 ]; then export RUN_LABEL="ochtend";
+          elif [ "$H" -lt 15 ]; then export RUN_LABEL="middag";
+          else export RUN_LABEL="avond"; fi
           echo "Datum $TARGET_DATE, meetmoment $RUN_LABEL ($(TZ=Europe/Amsterdam date +%H:%M))"
           # Bookeo blokkeert headless -> headed browser onder een virtueel scherm (xvfb)
           xvfb-run -a python scrape.py
