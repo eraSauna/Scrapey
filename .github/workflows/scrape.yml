@@ -3,9 +3,10 @@ name: Kuuma bezetting scraper
 on:
   workflow_dispatch:        # handmatig starten (voor testen)
   schedule:
-    # GitHub-cron draait in UTC (zomertijd): 04:00=06:00, 10:00=12:00, 15:00=17:00 Amsterdam.
-    # In wintertijd schuift dit 1 uur; zie README als je dat exact wilt houden.
-    - cron: "0 4 * * *"    # ochtend — hele dag
+    # GitHub-cron draait in UTC (zomertijd): 02:00=04:00, 10:00=12:00, 15:00=17:00 Amsterdam.
+    # Ochtend bewust vroeg (04:00) zodat 'ie ook mét cron-vertraging vóór het eerste slot draait
+    # en de hele dag pakt. In wintertijd schuift dit 1 uur; zie README.
+    - cron: "0 2 * * *"    # ochtend — hele dag
     - cron: "0 10 * * *"   # middag — update
     - cron: "0 15 * * *"   # avond — completere eindstand
 
@@ -38,15 +39,21 @@ jobs:
           PROXY_URL: ${{ secrets.PROXY_URL }}
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+          SCHEDULE: ${{ github.event.schedule }}   # welke cron triggerde (leeg bij handmatig)
         run: |
           export TARGET_DATE="$(TZ=Europe/Amsterdam date +%F)"
-          H="$(TZ=Europe/Amsterdam date +%H)"
-          # stabiel meetmoment: 06:00='ochtend' (hele dag), 12:00='middag', 17:00='avond' (update).
-          # Alleen 'ochtend' legt de vooraf-stand vast; middag/avond werken de laatste stand bij.
-          if [ "$H" -lt 8 ]; then export RUN_LABEL="ochtend";
-          elif [ "$H" -lt 15 ]; then export RUN_LABEL="middag";
-          else export RUN_LABEL="avond"; fi
-          echo "Datum $TARGET_DATE, meetmoment $RUN_LABEL ($(TZ=Europe/Amsterdam date +%H:%M))"
+          # Meetmoment bepalen op WELKE cron 'm triggerde (niet op de klok), zodat een late
+          # start het label niet verschuift. Alleen 'ochtend' legt de vooraf-stand vast.
+          case "$SCHEDULE" in
+            "0 2 * * *")  RL="ochtend" ;;
+            "0 10 * * *") RL="middag" ;;
+            "0 15 * * *") RL="avond" ;;
+            *)  # handmatige run: val terug op de klok (ruime ochtend-marge)
+                H="$(TZ=Europe/Amsterdam date +%H)"
+                if [ "$H" -lt 10 ]; then RL="ochtend"; elif [ "$H" -lt 15 ]; then RL="middag"; else RL="avond"; fi ;;
+          esac
+          export RUN_LABEL="$RL"
+          echo "Datum $TARGET_DATE, meetmoment $RUN_LABEL (schedule='$SCHEDULE', $(TZ=Europe/Amsterdam date +%H:%M))"
           # Bookeo blokkeert headless -> headed browser onder een virtueel scherm (xvfb)
           xvfb-run -a python scrape.py
 

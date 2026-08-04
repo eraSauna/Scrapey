@@ -1,6 +1,6 @@
 # Kuuma bezetting-scraper
 
-Leest 3× per dag (06:00, 12:00 en 17:00 Amsterdam) per locatie de Bookeo-widget uit — het
+Leest 3× per dag (04:00, 12:00 en 17:00 Amsterdam) per locatie de Bookeo-widget uit — het
 aantal **beschikbare plekken** per tijdslot — en schrijft dat naar **Supabase**.
 Reserveringen, bezetting % en omzet worden berekend in een SQL-view
 (reserveringen = max personen − beschikbaar).
@@ -54,9 +54,14 @@ PROXY_URL="http://user:pass@host:poort" DEBUG=1 ONLY=ams-bjork ./venv/bin/python
 ```
 
 ## Zomer-/wintertijd
-Cron staat op 01:00 en 10:00 UTC (= 03:00 en 12:00 zomertijd). Datum + tijdstempel worden
-altijd in Amsterdam-tijd bepaald, dus die kloppen jaarrond; alleen het run-moment schuift in
-de winter 1 uur. Wil je dat exact houden: in de winter cron op `0 2 * * *` en `0 11 * * *`.
+Cron staat op 02:00 / 10:00 / 15:00 UTC (= 04:00 / 12:00 / 17:00 zomertijd). Het meetmoment-label
+(ochtend/middag/avond) wordt bepaald op wélke cron triggerde (`github.event.schedule`), dus een
+late start verschuift het label niet. Datum + tijdstempel zijn altijd Amsterdam-tijd. In de winter
+schuift het run-moment 1 uur; wil je dat exact houden, zet de crons dan een uur op.
+
+## Healthchecks-schema
+Als je in healthchecks een cron-schema gebruikt: `0 4,12,17 * * *`, timezone Europe/Amsterdam,
+grace 2 uur (GitHub-cron kan flink later starten — ruime grace voorkomt vals alarm).
 
 ## Bestanden
 - `scrape.py` — hoofdscript (proxy, widget uitlezen, media blokkeren om data te sparen)
