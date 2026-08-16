@@ -1,0 +1,44 @@
+name: Saunaboot scraper
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 2 * * *"   # 04:00 Amsterdam (zomertijd) — ochtendmeting
+
+concurrency:
+  group: saunaboot-scraper
+  cancel-in-progress: false
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Installeer dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          python -m playwright install --with-deps chromium
+          sudo apt-get update && sudo apt-get install -y xvfb
+      - name: Draai boot-scraper (headed via xvfb)
+        env:
+          PROXY_URL: ${{ secrets.PROXY_URL }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+        run: |
+          export TARGET_DATE="$(TZ=Europe/Amsterdam date +%F)"
+          export RUN_LABEL="ochtend"
+          export DEBUG=1   # eerste runs: bewaar frame-HTML voor finetunen datumselectie
+          echo "Datum $TARGET_DATE"
+          xvfb-run -a python boot.py
+      - name: Bewaar debug-output
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: boot-debug
+          path: debug/
+          if-no-files-found: ignore
