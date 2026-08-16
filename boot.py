@@ -101,10 +101,13 @@ def displayed_date(text):
     except Exception: return None
 
 
+MAX_DAGEN = 3  # komende N boekbare dagen vastleggen
+
+
 def scrape(target, run_label, debug=False):
     proxy = build_proxy()
     headless = os.environ.get("HEADLESS") == "1"
-    res = {"date": target.isoformat(), "displayed_date": None, "slots": [], "error": None}
+    res = {"date": target.isoformat(), "days": [], "error": None}
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=headless, proxy=proxy,
                                     args=["--no-sandbox", "--disable-blink-features=AutomationControlled"])
@@ -142,11 +145,36 @@ def scrape(target, run_label, debug=False):
             if not frame:
                 res["error"] = "geen Bookeo-frame gevonden"; return res
 
-            res["displayed_date"] = (displayed_date(text) or target).isoformat()
-            res["slots"] = parse_slots(text)
-            if not res["slots"]:
-                res["error"] = "geen slots herkend"
-            page.wait_for_timeout(random.randint(700, 1600))
+            # Loop door de komende boekbare dagen via de 'volgende dag'-knop.
+            seen = set()
+            for _ in range(MAX_DAGEN * 3):
+                vd = displayed_date(text)
+                sl = parse_slots(text)
+                if vd and vd.isoformat() not in seen and sl:
+                    res["days"].append({"datum": vd.isoformat(), "slots": sl})
+                    seen.add(vd.isoformat())
+                if len(seen) >= MAX_DAGEN:
+                    break
+                btn = frame.query_selector("#cbTimeFixedNextDayBtn")
+                if not btn:
+                    break
+                prev = vd
+                try:
+                    btn.click(timeout=4000)
+                except Exception:
+                    break
+                changed = False
+                for _ in range(10):
+                    page.wait_for_timeout(700)
+                    try: text = frame.inner_text("body")
+                    except Exception: text = ""
+                    if displayed_date(text) and displayed_date(text) != prev:
+                        changed = True; break
+                if not changed:
+                    break  # geen volgende dag meer
+
+            if not res["days"]:
+                res["error"] = "geen dagen/slots herkend"
             return res
         except Exception as e:
             res["error"] = f"{type(e).__name__}: {str(e)[:120]}"; return res
@@ -156,12 +184,14 @@ def scrape(target, run_label, debug=False):
 
 def to_supabase(res, run_label):
     url = os.environ["SUPABASE_URL"].rstrip("/"); key = os.environ["SUPABASE_KEY"]
-    datum = res["displayed_date"] or res["date"]
-    rows = [{
-        "datum": datum, "slot_time": s["time"], "beschikbaar": s["beschikbaar"],
-        "wachtlijst": s["wachtlijst"], "geboekt": s["geboekt"], "prijs": s["prijs"],
-        "run_label": run_label,
-    } for s in res["slots"]]
+    rows = []
+    for day in res["days"]:
+        for s in day["slots"]:
+            rows.append({
+                "datum": day["datum"], "slot_time": s["time"], "beschikbaar": s["beschikbaar"],
+                "wachtlijst": s["wachtlijst"], "geboekt": s["geboekt"], "prijs": s["prijs"],
+                "run_label": run_label,
+            })
     if not rows:
         print("Supabase: geen rijen"); return
     req = urllib.request.Request(
@@ -185,8 +215,11 @@ def main():
     print(f"== Saunaboot scraper == doel={target} run={run_label} proxy={'ja' if build_proxy() else 'NEE'} supabase={'ja' if to_sb else 'nee'}")
 
     res = scrape(target, run_label, debug=debug)
-    geboekt = sum(1 for s in res["slots"] if s["geboekt"])
-    print(f"  displayed={res['displayed_date']} slots={len(res['slots'])} geboekt={geboekt} {res['error'] or ''}")
+    for day in res["days"]:
+        geboekt = sum(1 for s in day["slots"] if s["geboekt"])
+        print(f"  {day['datum']}: {len(day['slots'])} slots, {geboekt} geboekt")
+    if res["error"]:
+        print("  fout:", res["error"])
 
     if to_sb and not res["error"]:
         try: to_supabase(res, run_label)
