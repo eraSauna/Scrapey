@@ -10,11 +10,24 @@ Omzet = slotprijs van de geboekte slots.
 Env: PROXY_URL, SUPABASE_URL, SUPABASE_KEY, TARGET_DATE, RUN_LABEL, DEBUG, HEADLESS.
 Schrijft naar tabel boot_beschikbaarheid (upsert op datum+slot_time).
 """
-import os, re, sys, json, time, random, string, datetime, pathlib, urllib.request, urllib.error
+import os, re, sys, json, time, random, string, hashlib, datetime, pathlib, urllib.request, urllib.error
 from playwright.sync_api import sync_playwright
 
 URL = "https://www.desaunaboot.nl/boeken"
 CAP = 8  # hele boot; 8 getoond = vrij
+
+# Prijsstaffel per persoon (doordeweeks / weekend). Aantal personen is niet zichtbaar,
+# dus nemen we 3-6 aan — willekeurig maar STABIEL per slot (deterministisch), zodat de
+# omzet niet verspringt tussen runs/refreshes.
+LADDER = {
+    False: {3: 295, 4: 295, 5: 335, 6: 375},   # doordeweeks
+    True:  {3: 335, 4: 335, 5: 375, 6: 415},    # weekend
+}
+def geschatte_omzet(datum_iso, slot_time):
+    h = int(hashlib.md5(f"{datum_iso}{slot_time}".encode()).hexdigest(), 16)
+    personen = 3 + (h % 4)  # 3..6, stabiel per (datum, slot)
+    weekend = datetime.date.fromisoformat(datum_iso).weekday() >= 5
+    return personen, LADDER[weekend][personen]
 
 MND = {"januari":1,"februari":2,"maart":3,"april":4,"mei":5,"juni":6,"juli":7,
        "augustus":8,"september":9,"oktober":10,"november":11,"december":12,
@@ -187,10 +200,14 @@ def to_supabase(res, run_label):
     rows = []
     for day in res["days"]:
         for s in day["slots"]:
+            if s["geboekt"]:
+                personen, omzet = geschatte_omzet(day["datum"], s["time"])
+            else:
+                personen, omzet = None, 0
             rows.append({
                 "datum": day["datum"], "slot_time": s["time"], "beschikbaar": s["beschikbaar"],
                 "wachtlijst": s["wachtlijst"], "geboekt": s["geboekt"], "prijs": s["prijs"],
-                "run_label": run_label,
+                "personen": personen, "omzet": omzet, "run_label": run_label,
             })
     if not rows:
         print("Supabase: geen rijen"); return

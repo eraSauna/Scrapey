@@ -9,7 +9,9 @@ create table if not exists public.boot_beschikbaarheid (
     beschikbaar  int,                          -- getoond aantal (8 = vrij); null bij wachtlijst
     wachtlijst   boolean     not null default false,
     geboekt      boolean     not null,         -- true = boot bezet (wachtlijst of < 8 vrij)
-    prijs        numeric,                       -- slotprijs (bv. 295 / 335)
+    prijs        numeric,                       -- getoonde basisprijs op de site (2 pers)
+    personen     int,                           -- aangenomen groepsgrootte 3-6 (alleen bij geboekt)
+    omzet        numeric,                       -- geschatte omzet via staffel (3-6 pers); 0 bij vrij
     run_label    text,
     scraped_at   timestamptz not null default now(),
     unique (datum, slot_time)
@@ -24,7 +26,7 @@ select
     count(*) filter (where geboekt)                    as geboekt,
     round(count(*) filter (where geboekt)::numeric
           / nullif(count(*), 0), 3)                    as bezetting,
-    coalesce(sum(prijs) filter (where geboekt), 0)     as omzet,
+    coalesce(sum(omzet), 0)                            as omzet,
     max(scraped_at)                                    as laatst_bijgewerkt
 from public.boot_beschikbaarheid
 group by datum
