@@ -19,7 +19,12 @@ CAP = 8  # hele boot; 8 getoond = vrij
 MND = {"januari":1,"februari":2,"maart":3,"april":4,"mei":5,"juni":6,"juli":7,
        "augustus":8,"september":9,"oktober":10,"november":11,"december":12,
        "january":1,"february":2,"march":3,"may":5,"june":6,"july":7,"october":10}
-DATE_RE = re.compile(r"(\d{1,2})\s+([a-z]+)\s+(\d{4})", re.I)
+# datum staat als "DINSDAG\n18 AUGUSTUS 2026" — anker op de weekdagnaam,
+# anders pakt de regex per ongeluk het gasten-getal vóór "AUGUSTUS 2026".
+DATE_RE = re.compile(
+    r"(?:maandag|dinsdag|woensdag|donderdag|vrijdag|zaterdag|zondag|"
+    r"monday|tuesday|wednesday|thursday|friday|saturday|sunday)\s*\n?\s*"
+    r"(\d{1,2})\s+([a-z]+)\s+(\d{4})", re.I)
 TIME_RE = re.compile(r"^\s*(\d{1,2})[:.](\d{2})\s*$")
 PRICE_RE = re.compile(r"[€€]\s?(\d+)")
 WL_RE = re.compile(r"wachtlijst|waitlist|\bvol\b|\bfull\b|niet beschikbaar|not available", re.I)
