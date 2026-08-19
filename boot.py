@@ -130,7 +130,14 @@ def scrape(target, run_label, debug=False):
                                   user_agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36")
         ctx.add_init_script("Object.defineProperty(navigator,'webdriver',{get:()=>undefined});")
         page = ctx.new_page()
-        page.route("**/*", lambda r: r.abort() if r.request.resource_type in ("image", "media", "font") else r.continue_())
+        # Wix-site is zwaar: blokkeer CSS/afbeeldingen/media/fonts en tracking/analytics.
+        _BTYPES = ("image", "media", "font", "stylesheet")
+        _BHOSTS = ("google-analytics", "googletagmanager", "doubleclick", "connect.facebook",
+                   "hotjar", "clarity.ms", "cookiebot", "cookielaw", "onetrust", "fullstory",
+                   "cloudflareinsights", "sentry.io", "bat.bing", "yandex", "taboola", "criteo",
+                   "adservice", "quantserve", "scorecardresearch", "wixapis.com/analytics",
+                   "frog.wix.com", "panorama.wixapps", "google.com/recaptcha")
+        page.route("**/*", lambda r: r.abort() if (r.request.resource_type in _BTYPES or any(h in r.request.url for h in _BHOSTS)) else r.continue_())
         try:
             goto_retry(page, URL)
             for sel in ["button:has-text('Accepteren')", "text=Accepteren", "button:has-text('Alle')", ".cmplz-accept"]:

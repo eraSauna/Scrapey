@@ -132,8 +132,18 @@ def scrape_location(browser, proxy, loc, target_date, debug=False):
     ctx.add_init_script("Object.defineProperty(navigator,'webdriver',{get:()=>undefined});")
     page = ctx.new_page()
 
+    # Data besparen: blokkeer alles wat we niet nodig hebben. We lezen alleen de
+    # tekst van de Bookeo-widget, dus CSS/afbeeldingen/media/fonts en alle
+    # tracking/analytics kunnen weg — resultaat blijft gelijk, data fors lager.
+    BLOCK_TYPES = ("image", "media", "font", "stylesheet")
+    BLOCK_HOSTS = ("google-analytics", "googletagmanager", "doubleclick", "connect.facebook",
+                   "hotjar", "clarity.ms", "cookiebot", "cookielaw", "onetrust", "fullstory",
+                   "cloudflareinsights", "sentry.io", "bat.bing", "yandex", "taboola",
+                   "criteo", "adservice", "quantserve", "scorecardresearch")
     def route(r):
-        if r.request.resource_type in ("image", "media", "font"):
+        if r.request.resource_type in BLOCK_TYPES:
+            return r.abort()
+        if any(h in r.request.url for h in BLOCK_HOSTS):
             return r.abort()
         return r.continue_()
     page.route("**/*", route)
