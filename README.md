@@ -1,6 +1,6 @@
 # Kuuma bezetting-scraper
 
-Leest 3× per dag (04:00, 12:00 en 17:00 Amsterdam) per locatie de Bookeo-widget uit — het
+Leest 2× per dag (04:00 en 15:00 Amsterdam) per locatie de Bookeo-widget uit — het
 aantal **beschikbare plekken** per tijdslot — en schrijft dat naar **Supabase**.
 Reserveringen, bezetting % en omzet worden berekend in een SQL-view
 (reserveringen = max personen − beschikbaar).

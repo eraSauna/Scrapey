@@ -3,12 +3,11 @@ name: Kuuma bezetting scraper
 on:
   workflow_dispatch:        # handmatig starten (voor testen)
   schedule:
-    # GitHub-cron draait in UTC (zomertijd): 02:00=04:00, 10:00=12:00, 15:00=17:00 Amsterdam.
+    # GitHub-cron draait in UTC (zomertijd): 02:00=04:00, 13:00=15:00 Amsterdam.
     # Ochtend bewust vroeg (04:00) zodat 'ie ook mét cron-vertraging vóór het eerste slot draait
     # en de hele dag pakt. In wintertijd schuift dit 1 uur; zie README.
-    - cron: "0 2 * * *"    # ochtend — hele dag
-    - cron: "0 10 * * *"   # middag — update
-    - cron: "0 15 * * *"   # avond — completere eindstand
+    - cron: "0 2 * * *"    # ochtend (04:00) — hele dag
+    - cron: "0 13 * * *"   # middag (15:00) — update
 
 concurrency:
   group: kuuma-scraper
@@ -46,11 +45,10 @@ jobs:
           # start het label niet verschuift. Alleen 'ochtend' legt de vooraf-stand vast.
           case "$SCHEDULE" in
             "0 2 * * *")  RL="ochtend" ;;
-            "0 10 * * *") RL="middag" ;;
-            "0 15 * * *") RL="avond" ;;
+            "0 13 * * *") RL="middag" ;;
             *)  # handmatige run: val terug op de klok (ruime ochtend-marge)
                 H="$(TZ=Europe/Amsterdam date +%H)"
-                if [ "$H" -lt 10 ]; then RL="ochtend"; elif [ "$H" -lt 15 ]; then RL="middag"; else RL="avond"; fi ;;
+                if [ "$H" -lt 10 ]; then RL="ochtend"; else RL="middag"; fi ;;
           esac
           export RUN_LABEL="$RL"
           echo "Datum $TARGET_DATE, meetmoment $RUN_LABEL (schedule='$SCHEDULE', $(TZ=Europe/Amsterdam date +%H:%M))"
