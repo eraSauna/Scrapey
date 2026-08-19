@@ -114,7 +114,7 @@ def displayed_date(text):
     except Exception: return None
 
 
-MAX_DAGEN = 3  # komende N boekbare dagen vastleggen
+MAX_DAGEN = 1  # alleen de getoonde (huidige/eerstvolgende) vaardag; niet vooruitkijken
 
 
 def scrape(target, run_label, debug=False):
