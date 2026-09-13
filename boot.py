@@ -238,7 +238,18 @@ def main():
     to_sb = bool(os.environ.get("SUPABASE_URL") and os.environ.get("SUPABASE_KEY"))
     print(f"== Saunaboot scraper == doel={target} run={run_label} proxy={'ja' if build_proxy() else 'NEE'} supabase={'ja' if to_sb else 'nee'}")
 
-    res = scrape(target, run_label, debug=debug)
+    # Een mislukte IPRoyal-tunnel blijft binnen dezelfde browser/proxy-sessie
+    # doorgaans defect. Start daarom bij een scrape-fout opnieuw met een verse
+    # browser en een nieuw session-id/IP, net zoals de Kuuma-scraper doet.
+    max_attempts = 3
+    for attempt in range(1, max_attempts + 1):
+        res = scrape(target, run_label, debug=debug)
+        if not res["error"]:
+            break
+        print(f"  poging {attempt}/{max_attempts} mislukt: {res['error']}")
+        if attempt < max_attempts:
+            time.sleep(random.uniform(3, 6))
+
     for day in res["days"]:
         geboekt = sum(1 for s in day["slots"] if s["geboekt"])
         print(f"  {day['datum']}: {len(day['slots'])} slots, {geboekt} geboekt")
