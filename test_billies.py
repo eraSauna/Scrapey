@@ -6,6 +6,12 @@ from scrape import parse_slots_from_text
 
 
 SAMPLE = """
+Sauna
+any
+Big Billies - morning mini steam - Zandvoort
+Big Billies - Zandvoort
+The Barrel - Zandvoort
+Pick date Following days
 Big Billies - morning mini steam - Zandvoort
 Fri, 18 September 2026
 07:00

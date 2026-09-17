@@ -42,10 +42,12 @@ DATE_RE = re.compile(
 def service_section(text):
     """Isoleer de gewone Big Billies-kaart en sluit Mini Steam/The Barrel uit."""
     lines = [line.strip() for line in text.splitlines() if line.strip()]
-    try:
-        start = next(i for i, line in enumerate(lines) if line.casefold() == SERVICE_TITLE.casefold())
-    except StopIteration:
+    starts = [i for i, line in enumerate(lines) if line.casefold() == SERVICE_TITLE.casefold()]
+    if not starts:
         return ""
+    # De titel staat eerst in het Bookeo-filter en later nogmaals boven de echte
+    # tijdsloten. De laatste vermelding is de inhoudelijke servicekaart.
+    start = starts[-1]
     end = next(
         (i for i in range(start + 1, len(lines)) if lines[i].casefold() == NEXT_SERVICE_TITLE.casefold()),
         len(lines),
