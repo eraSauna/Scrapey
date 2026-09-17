@@ -14,7 +14,12 @@ import traceback
 from scrape import build_proxy, goto_retry, parse_slots_from_text
 
 
-BOOKING_URL = "https://www.billiessauna.com/nl/book-now"
+# Officieel Bookeo-component dat op /nl/book-now in een Wix HTML-frame staat.
+# Rechtstreeks laden voorkomt dat Wix in xvfb alleen het buitenste frame activeert.
+BOOKING_URL = (
+    "https://www-billiessauna-com.filesusr.com/html/"
+    "a504cf_38000c50c70e8c4dabd9304bd370a788.html"
+)
 SERVICE_TITLE = "Big Billies - Zandvoort"
 NEXT_SERVICE_TITLE = "The Barrel - Zandvoort"
 MAX_CAPACITY = 6
