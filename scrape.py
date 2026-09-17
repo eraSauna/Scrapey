@@ -44,14 +44,14 @@ def parse_proxy(url):
     return d
 
 
-def build_proxy():
+def build_proxy(session_prefix="kuuma"):
     """Basis-creds uit PROXY_URL; voor IPRoyal voegen we NL-geo + sticky sessie toe."""
     d = parse_proxy(os.environ.get("PROXY_URL", ""))
     if not d:
         return None
     if "iproyal" in d["server"] and d.get("password") and "_session-" not in d["password"]:
         country = os.environ.get("PROXY_COUNTRY", "nl")
-        sess = "kuuma" + "".join(random.choice(string.ascii_lowercase + string.digits) for _ in range(8))
+        sess = session_prefix + "".join(random.choice(string.ascii_lowercase + string.digits) for _ in range(8))
         d["password"] = f'{d["password"]}_country-{country}_session-{sess}_lifetime-30m'
     return d
 

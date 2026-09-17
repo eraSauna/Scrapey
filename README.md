@@ -5,6 +5,11 @@ aantal **beschikbare plekken** per tijdslot — en schrijft dat naar **Supabase*
 Reserveringen, bezetting % en omzet worden berekend in een SQL-view
 (reserveringen = max personen − beschikbaar).
 
+Daarnaast volgt `billies.py` op dezelfde meetmomenten uitsluitend **Big Billies -
+Zandvoort**. Morning Mini Steam en The Barrel worden bewust niet meegenomen. De ruwe
+metingen staan in `billies_beschikbaarheid`; `billies_dag` en `billies_slot` leveren
+de samenvattingen voor de aparte dashboardpagina.
+
 Draait op GitHub Actions (gratis) via een **residentiële proxy** (Bookeo blokkeert
 datacenter/geflagde IP's) en in een **headed** browser onder xvfb (Bookeo blokkeert
 headless browsers met een "session inactive"-fout).
@@ -39,6 +44,7 @@ headless browsers met een "session inactive"-fout).
 
 ## Starten en testen
 - **Actions**-tab → "Kuuma bezetting scraper" → **Run workflow** (handmatig).
+- Voor Big Billies: "Big Billies bezetting scraper" → **Run workflow**.
 - Eerste run vult de metingen van vandaag; bekijk ze in Supabase:
   - Tabel `slot_beschikbaarheid` (ruwe metingen)
   - View `bezetting_dag` (reserveringen, bezetting %, omzet per locatie/dag)
@@ -69,6 +75,9 @@ grace 2 uur (GitHub-cron kan flink later starten — ruime grace voorkomt vals a
 - `schema.sql` — tabel + views (eenmalig in Supabase draaien)
 - `locations.py` — 9 locaties met Bookeo-id's, tijdslots, prijs, capaciteit
 - `.github/workflows/scrape.yml` — de 2×/dag cron
+- `billies.py` / `billies_supa.py` — Big Billies-widget en Supabase-upsert
+- `billies_schema.sql` — afgeschermde Big Billies-tabel + dashboardviews
+- `.github/workflows/billies.yml` — Big Billies ochtend- en middagmeting
 
 ## Werking (gevalideerd)
 - Getest via een NL residentiële proxy: alle 3 de Bookeo-accounts leveren correcte slots.
