@@ -112,6 +112,16 @@ def scrape_once(browser, proxy, target, debug=False):
             except Exception:
                 pass
 
+        # Wix activeert het geneste Bookeo-frame pas wanneer het HTML-component in
+        # beeld komt. In xvfb staat dit onder de vouw, dus expliciet ernaartoe scrollen.
+        try:
+            booking_frame = page.locator("iframe[src*='filesusr.com/html']").first
+            booking_frame.scroll_into_view_if_needed(timeout=8000)
+            page.wait_for_timeout(1200)
+        except Exception:
+            page.evaluate("window.scrollTo(0, document.body.scrollHeight / 2)")
+            page.wait_for_timeout(1200)
+
         error = None
         for _ in range(20):
             page.wait_for_timeout(random.randint(1800, 2800))
