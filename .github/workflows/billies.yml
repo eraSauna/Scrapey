@@ -36,6 +36,7 @@ jobs:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
           SCHEDULE: ${{ github.event.schedule }}
+          DEBUG: "1"
         run: |
           export TARGET_DATE="$(TZ=Europe/Amsterdam date +%F)"
           case "$SCHEDULE" in

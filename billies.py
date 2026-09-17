@@ -128,7 +128,14 @@ def scrape_once(browser, proxy, target, debug=False):
         if debug:
             directory = pathlib.Path("debug")
             directory.mkdir(exist_ok=True)
-            (directory / "billies.txt").write_text(section or "", encoding="utf-8")
+            frame_dump = []
+            for index, frame in enumerate(page.frames):
+                try:
+                    body = frame.inner_text("body")
+                except Exception as exc:
+                    body = f"<niet leesbaar: {type(exc).__name__}>"
+                frame_dump.append(f"===== FRAME {index}: {frame.url} =====\n{body[:200000]}")
+            (directory / "billies.txt").write_text("\n\n".join(frame_dump), encoding="utf-8")
 
         if error:
             return {"date": target.isoformat(), "slots": [], "error": error}
