@@ -58,6 +58,10 @@ jobs:
         if: failure() && env.HC_PING_URL != ''
         run: curl -fsS --max-time 15 --retry 3 "${HC_PING_URL%/}/fail" || true
 
+      - name: Toon widget-debug bij fout
+        if: failure()
+        run: sed -n '1,500p' debug/billies.txt || true
+
       - name: Bewaar debug-output
         if: always()
         uses: actions/upload-artifact@v4
