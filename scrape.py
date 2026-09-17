@@ -71,7 +71,7 @@ def goto_retry(page, url, n=4):
 
 # ---------------------------------------------------------------- parsing
 TIME_RE = re.compile(r"^\s*(\d{1,2}[:.]\d{2})\s*$")
-AVAIL_RE = re.compile(r"available[:\s]*?(\d+)", re.I)
+AVAIL_RE = re.compile(r"(?:(?:available|beschikbaar)[:\s]*?(\d+)|(\d+)\s*(?:available|beschikbaar))", re.I)
 FULL_RE = re.compile(r"\b(full|vol|volgeboekt|niet beschikbaar|not available)\b", re.I)
 DATE_RE = re.compile(r"(monday|tuesday|wednesday|thursday|friday|saturday|sunday|maandag|dinsdag|woensdag|donderdag|vrijdag|zaterdag|zondag)\s*\n?\s*(\d{1,2})\s+([a-z]+)\s+(\d{4})", re.I)
 
@@ -90,7 +90,8 @@ def parse_slots_from_text(text):
         window = " ".join(lines[i + 1:i + 3])
         a = AVAIL_RE.search(window)
         if a:
-            out.append({"time": t, "available": int(a.group(1))})
+            value = next(group for group in a.groups() if group is not None)
+            out.append({"time": t, "available": int(value)})
         elif FULL_RE.search(window):
             out.append({"time": t, "available": 0})
     seen, uniq = set(), []

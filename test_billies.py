@@ -20,7 +20,7 @@ Big Billies - Zandvoort
 Fri, 18 September 2026
 Shared sauna
 09:00
-Available: 2
+2 Available
 10:30
 Available: 2
 12:00
