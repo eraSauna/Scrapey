@@ -8,10 +8,10 @@ Supabase en je IPRoyal-account (zie "Accounts").
 
 ## 1. Wat het is
 
-Twee **gescheiden** trackers die de bezetting/omzet van saunalocaties volgen door hun
-online boekingswidget (Bookeo) uit te lezen:
+Drie **gescheiden** trackers die de bezetting/omzet van saunalocaties volgen:
 
-- **Kuuma** — 9 sauna-locaties (concurrentie-monitoring). 2× per dag gemeten.
+- **Kuuma** — 10 actieve sauna's via Periode. 2× per dag gemeten.
+- **Big Billies** — 1 sauna in Zandvoort. 2× per dag gemeten.
 - **De Saunaboot** — 1 privé-saunaboot in Kortenhoef. 1× per dag gemeten.
 
 De data van beide **kruist nooit**: aparte scrapers, aparte Supabase-tabellen, aparte
@@ -22,19 +22,19 @@ dashboard-sectie. Ze delen wel dezelfde infrastructuur (proxy, Supabase-project,
 ## 2. Architectuur (dataflow)
 
 ```
-GitHub Actions (cron)  ──►  Playwright-scraper (headed via xvfb)  ──►  residentiële proxy  ──►  Bookeo-widget
-        │                                                                                          │
-        │                                            leest per tijdslot de beschikbaarheid ◄────────┘
+GitHub Actions (cron)  ──►  Kuuma: HTTP/JSON  ──►  Periode-overzicht (alle sauna's in één call)
+        │              Billies/Boot: Playwright + proxy ──► Bookeo-widget
+        │                                            │
+        │                       leest per tijdslot de beschikbaarheid ◄──────┘
         ▼
    schrijft (upsert) naar Supabase  ──►  SQL-views berekenen reserveringen/bezetting/omzet
         ▼
    Next.js-dashboard op Vercel  ◄── leest Supabase server-side met de secret key
 ```
 
-**Waarom deze opzet:**
-- Bookeo blokkeert **datacenter-/geflagde IP's** → daarom een **residentiële proxy** (IPRoyal).
-- Bookeo blokkeert **headless browsers** → daarom **headed Chromium onder xvfb** in de CI.
-- De widget rendert in een cross-origin iframe → Playwright leest die frame uit.
+**Waarom deze opzet:** Kuuma levert sinds september 2026 gestructureerde Periode-data en heeft
+geen browser/proxy meer nodig. Bookeo blokkeert bij Billies/Boot nog wel datacenter-IP's en
+headless browsers; alleen die scrapers gebruiken daarom IPRoyal en Chromium onder xvfb.
 
 ---
 
@@ -76,19 +76,22 @@ Beide staan onder de **eraSauna** GitHub-organisatie. De scraper draait op GitHu
 
 ## 5. Hoe de scrapers werken
 
-### Kuuma — `scrape.py` + `.github/workflows/scrape.yml`
-- **9 locaties** staan in `locations.py` (naam, slug/URL, Bookeo-id's, max personen, prijs, tijdslots).
-  Er zijn 3 Bookeo-accounts verdeeld over de locaties.
-- Per locatie: laadt `https://kuuma.nl/boek-nu/<slug>/`, vindt de Bookeo-frame, leest per
-  tijdslot **"Available: N"**. `reserveringen = max personen − beschikbaar`.
+### Kuuma — `periode.py` + `.github/workflows/scrape.yml`
+- Haalt bij elke run eerst de actuele publieke nonce van een Kuuma-boekingspagina.
+- Vraagt daarna via `periode_get_day` alle actieve sauna's en drop-in-slots in één JSON-call op.
+- Capaciteit, prijs en beschikbaarheid komen live mee; `reserveringen = capaciteit − beschikbaar`.
+- `locations.py` bewaart alleen de stabiele koppeling voor historische keys. Nieuwe actieve
+  sauna's krijgen automatisch een key en worden vóór hun metingen in Supabase ge-upsert.
+- Actief bij migratie: de 9 bestaande locaties plus **Amsterdam Aan 't IJ**. Periode kent ook
+  Wijk aan Zee en Scheveningen, maar die worden pas toegevoegd zodra ze boekbare sauna-slots hebben.
 - **2 runs/dag** (Amsterdam): **04:00 (ochtend)** meet de hele dag en legt de vooraf-stand vast
   (`beschikbaar_ochtend`); **15:00 (middag)** werkt de nog-open slots bij.
-- **Robuustheid:** vers proxy-IP per locatie + tot 3 pogingen per locatie met telkens een nieuw IP;
-  retry op alle tunnel-/netwerkfouten.
+- **Robuustheid:** drie begrensde HTTP-pogingen en harde validatie op datum, capaciteit,
+  beschikbaarheid, dubbele slots en lege responses.
 - **Meetmoment (`RUN_LABEL`)** wordt bepaald op **wélke cron** de run triggerde (`github.event.schedule`),
   niet op de klok — zo verschuift een late cron-start het label niet. Alleen `ochtend` legt de
   vooraf-stand vast.
-- **Datazuinig:** blokkeert afbeeldingen/media/fonts/**CSS** en tracking/analytics (~90% minder data).
+- **Datazuinig:** geen browserinstallatie, screenshots of proxyverkeer; normale run duurt seconden.
 
 ### Saunaboot — `boot.py` + `.github/workflows/boot.yml`
 - **1 pagina:** `https://www.desaunaboot.nl/boeken` (Wix-site met Bookeo-widget).
@@ -99,11 +102,9 @@ Beide staan onder de **eraSauna** GitHub-organisatie. De scraper draait op GitHu
   (doordeweeks/weekend). Zie `LADDER` in `boot.py`.
 - **1 run/dag: 04:00 (ochtend)**. Via upsert eindigt elke vaardag met zijn dag-zelf-waarde.
 
-### Belangrijke details (beide)
-- Draaien **headed via xvfb** in de workflow (`xvfb-run -a python …`). Lokaal debuggen kan met
-  `HEADLESS=1`, maar dan blokkeert Bookeo de widget — alleen voor niet-widget-tests.
-- Env vars: `PROXY_URL`, `SUPABASE_URL`, `SUPABASE_KEY`, `TARGET_DATE` (default: vandaag Amsterdam),
-  `RUN_LABEL`, `DEBUG=1` (bewaart frame-HTML als artifact), `ONLY=key1,key2` (alleen die locaties).
+### Belangrijke details
+- Kuuma-env vars: `SUPABASE_URL`, `SUPABASE_KEY`, `TARGET_DATE`, `RUN_LABEL` en optioneel `ONLY`.
+- Billies/Boot draaien nog **headed via xvfb** en gebruiken daarnaast `PROXY_URL` en `DEBUG`.
 
 ---
 
@@ -177,8 +178,9 @@ Pas `schema.sql` / `boot_schema.sql` aan én draai de gewijzigde SQL in de Supab
 
 | Symptoom | Oorzaak | Oplossing |
 |---|---|---|
-| Alle locaties falen op `ERR_TUNNEL_CONNECTION_FAILED`, of `curl` door de proxy geeft **402** | IPRoyal-datategoed op | Log in op IPRoyal (theovanjacobus@gmail.com) → koop data bij |
-| Eén locatie faalt af en toe | tijdelijke flaky proxy-IP | zelfherstellend (retries + 2 runs/dag) |
+| Billies/Boot falen op `ERR_TUNNEL_CONNECTION_FAILED`, of proxy geeft **402** | IPRoyal-datategoed op | Log in op IPRoyal → koop data bij |
+| Kuuma meldt `periodeData-config niet gevonden` | Kuuma heeft de boekingspagina gewijzigd | inspecteer `periodeData` in de paginabron en pas `periode.py` aan |
+| Nieuwe Kuuma-locatie verschijnt | Periode levert voor het eerst actieve slots | wordt automatisch toegevoegd; controleer de `NIEUW`-regel in de log |
 | Run faalt volledig | zie logs | je krijgt mail via GitHub én healthchecks |
 | "unauthorized IP" in de frame-tekst | proxy-IP door Bookeo geflagd | vers IP (gebeurt automatisch per locatie) |
 | Node.js 20 deprecation-warning | GitHub forceert Node 24 op de acties | onschuldig, negeren |
@@ -197,7 +199,7 @@ check-schema op cron `0 4,15 * * *` (Europe/Amsterdam) of laat het op "1 day per
 
 ## 10. Kosten
 
-Praktisch alleen de **proxy**: bij ~30 MB/dag ≈ ~0,9 GB/maand × ~$6/GB = **~€5–7 per maand**.
+Praktisch alleen de **proxy voor Billies/Boot**; Kuuma verbruikt geen proxydata meer.
 GitHub Actions, Supabase, Vercel en Healthchecks zitten in gratis tiers.
 
 ---
@@ -206,9 +208,11 @@ GitHub Actions, Supabase, Vercel en Healthchecks zitten in gratis tiers.
 
 | Bestand | Doel |
 |---|---|
-| `scrape.py` | Kuuma-scraper (9 locaties) |
+| `periode.py` | Actieve Kuuma/Periode-scraper (automatische locaties) |
+| `scrape.py` | Oude Bookeo-scraper; niet meer actief in de workflow |
 | `boot.py` | Saunaboot-scraper (1 pagina) |
-| `locations.py` | Kuuma-locatieconfig (Bookeo-id's, slots, prijs) |
+| `locations.py` | Stabiele koppeling tussen Periode en historische locatiekeys |
+| `test_periode.py` | Parser-, validatie- en Supabase-volgordetests |
 | `supa.py` | Supabase-upsert voor Kuuma |
 | `schema.sql` / `boot_schema.sql` | Supabase-schema's |
 | `requirements.txt` | `playwright` |

@@ -1,13 +1,15 @@
--- Kuuma bezetting — Supabase schema (alle 9 locaties)
+-- Kuuma bezetting — Supabase schema (Periode; actieve locaties worden ook automatisch ge-upsert)
 -- Plak dit volledig in de SQL Editor van je Supabase-project en run het.
 
--- 1) Referentietabel: de locaties (metadata + Bookeo-id's + tijdslots).
+-- 1) Referentietabel: locaties + provider-identiteit + actuele tijdslots.
+-- De historische kolomnamen bookeo_* blijven behouden om live migratie te vermijden;
+-- bij nieuwe metingen bevatten ze "periode:<location-id>" en het service-id.
 create table if not exists public.locaties (
     key           text primary key,
     naam          text    not null,
     slug          text    not null,
-    bookeo_a      text    not null,      -- Bookeo-account
-    bookeo_type   text    not null,      -- product-id per locatie
+    bookeo_a      text    not null,      -- provider + locatie-id (historische kolomnaam)
+    bookeo_type   text    not null,      -- service-id (historische kolomnaam)
     maxdrop       int     not null,      -- max personen drop-in
     prijs         numeric not null,
     geopend_tot   date,
@@ -15,15 +17,16 @@ create table if not exists public.locaties (
 );
 
 insert into public.locaties (key, naam, slug, bookeo_a, bookeo_type, maxdrop, prijs, geopend_tot, slots) values
-  ('ams-bjork','Ams Björk','marineterrein-bjork','3254A3FXXU175D69E71C5','3254PATUWN17B8204191E',6,17.5,'2027-04-30','{07:00,08:30,10:00,11:30,13:00,14:30,16:30,18:00,19:30,21:00,22:30}'),
-  ('ams-matsu','Ams Matsu','marineterrein-matsu','3254A3FXXU175D69E71C5','3254X4FRFA191E02B7FD6',8,17.5,'2027-04-30','{06:30,08:00,09:30,11:00,12:30,14:00,16:00,17:30,19:00,20:30,22:00}'),
-  ('ams-noord','Ams Noord','boek-sauna-amsterdam-noord','3254A3FXXU175D69E71C5','325467EJPF183698FB466',6,17.5,'2026-12-31','{07:00,08:30,10:00,11:30,13:00,15:15,16:45,18:15,19:45,21:15,22:45}'),
-  ('den-bosch','Den Bosch','kuuma-den-bosch','32547XC6XX191747C1FE3','32549FJM9P199F2A9FD38',7,17.5,'2026-12-31','{07:00,08:30,10:45,12:15,13:45,15:15,16:45,18:15,19:45,21:15}'),
-  ('egmond','Egmond aan Zee','boek-sauna-egmond-aan-zee','3254EHPF3N198F61DFBD6','3254XHH93619E97C3F863',10,17.5,'2026-12-31','{07:00,08:30,10:30,12:00,13:30,15:00,17:00,18:30,20:00,21:30}'),
-  ('kallumaan','Kallumaan','drop-in-kallumaan','3254A3FXXU175D69E71C5','32546LKUKL1878F1D6984',7,15.0,'2026-09-30','{07:00,09:15,11:30,13:45,16:00,18:15,20:30}'),
-  ('nijmegen-lent','Nijmegen Lent','boek-sauna-nijmegen-lent','32547XC6XX191747C1FE3','3254MAC9XU19174D5D1AC',6,17.5,'2026-07-31','{07:00,08:30,10:00,11:30,13:00,14:30,16:00,17:30,19:00,20:30,22:00}'),
-  ('nijmegen-nyma','Nijmegen Nyma','kuuma-nyma','32547XC6XX191747C1FE3','32547WAWX619817809442',7,17.5,'2026-11-01','{07:00,08:30,10:00,11:30,13:00,14:30,16:00,17:30,19:00,20:30}'),
-  ('rotterdam-delfshaven','Rotterdam Delfshaven','boek-sauna-rotterdam-delfshaven','32547XC6XX191747C1FE3','3254WA9ELT19600DB8361',6,17.5,'2027-04-30','{07:00,08:30,10:00,11:30,13:00,14:30,16:00,17:30,19:00,20:30,22:00}')
+  ('ams-bjork','Ams Björk','marineterrein-bjork','periode:amsterdam-marineterrein','uDw4a2pDUAyQ3XXonN2o',6,18.5,null,'{07:00,08:30,10:00,11:30,13:00,14:30,16:30,18:00,19:30,21:00,22:30}'),
+  ('ams-matsu','Ams Matsu','marineterrein-matsu','periode:amsterdam-marineterrein','G7yzdhmpEiaM1yWCPCc0',8,18.5,null,'{06:30,08:00,09:30,11:00,12:30,14:00,16:00,17:30,19:00,20:30,22:00}'),
+  ('ams-noord','Ams Noord','boek-sauna-amsterdam-noord','periode:amsterdam-noord','ZKtSDPE2CNDgrjRi39ZM',6,18.5,null,'{07:00,08:30,10:00,11:30,13:00,15:15,16:45,18:15,19:45,21:15}'),
+  ('den-bosch','Den Bosch','kuuma-den-bosch','periode:den-bosch','2KC4CrIgY5Twam05fjEr',6,18.5,null,'{07:00,08:30,10:45,12:15,13:45,15:15,16:45,18:15,19:45,21:15}'),
+  ('egmond','Egmond aan Zee','boek-sauna-egmond-aan-zee','periode:egmond-aan-zee','cSiOCBqe8ETkZgvyTmIl',10,18.5,null,'{07:00,08:30,10:30,12:00,13:30,15:00,17:00,18:30,20:00,21:30}'),
+  ('kallumaan','Kallumaan','drop-in-kallumaan','periode:kallumaan','TzAhXeq4O9FKYJwZS02s',7,18.5,null,'{07:00,09:15,11:30,13:45,16:00,18:15,20:30}'),
+  ('nijmegen-lent','Nijmegen Lent','boek-sauna-nijmegen-lent','periode:nijmegen-lent','JggN0BBfFl24F3WRHeRn',6,18.5,null,'{07:00,08:30,10:00,11:30,13:00,14:30,16:00,17:30,19:00,20:30,22:00}'),
+  ('nijmegen-nyma','Nijmegen Nyma','nijmegen-nyma','periode:nijmegen-nyma','Bu9WNfv2cyfImPufbULw',7,18.5,null,'{07:00,08:30,10:00,11:30,13:00,14:30,16:00,17:30,19:00,20:30}'),
+  ('rotterdam-delfshaven','Rotterdam Delfshaven','boek-sauna-rotterdam-delfshaven','periode:rotterdam-delfshaven','Pqc1jrrRSP3gIe1Vxn6R',6,18.5,null,'{07:00,08:30,10:00,11:30,13:00,14:30,16:00,17:30,19:00,20:30,22:00}'),
+  ('amsterdam-aan-t-ij','Amsterdam Aan ''t IJ','boek-sauna-amsterdam-aan-t-ij','periode:amsterdam-aan-t-ij','7fC6AcqCG9i1q9sYLExl',6,18.5,null,'{07:00,08:30,10:00,11:30,13:00,15:15,16:45,18:15,19:45,21:15}')
 on conflict (key) do update set
   naam=excluded.naam, slug=excluded.slug, bookeo_a=excluded.bookeo_a, bookeo_type=excluded.bookeo_type,
   maxdrop=excluded.maxdrop, prijs=excluded.prijs, geopend_tot=excluded.geopend_tot, slots=excluded.slots;
@@ -36,10 +39,10 @@ create table if not exists public.slot_beschikbaarheid (
     datum          date        not null,
     slot_time      text        not null,      -- bv. "07:00"
     beschikbaar    int         not null,      -- laatste stand die de site toont (0 = vol)
-    beschikbaar_ochtend int,                   -- stand bij de 03:00-run (blijft staan; middag overschrijft niet)
+    beschikbaar_ochtend int,                   -- vroege stand (blijft staan; middag overschrijft niet)
     max_capaciteit int         not null,      -- max personen drop-in op moment van meten
     prijs          numeric     not null,
-    run_label      text,                       -- "03:00" / "12:00"
+    run_label      text,                       -- "ochtend" / "middag"
     scraped_at     timestamptz not null default now(),
     unique (location_key, datum, slot_time)
 );
@@ -62,7 +65,7 @@ select
     round(
         sum((max_capaciteit - beschikbaar) * prijs), 2)  as omzet,
     max(scraped_at)                                      as laatst_bijgewerkt,
-    -- stand zoals gemeten om 03:00 (voornamelijk vooraf geboekt)
+    -- stand zoals gemeten in de ochtend (voornamelijk vooraf geboekt)
     sum(max_capaciteit - coalesce(beschikbaar_ochtend, beschikbaar))                     as reserveringen_ochtend,
     round(sum((max_capaciteit - coalesce(beschikbaar_ochtend, beschikbaar)) * prijs), 2) as omzet_ochtend
 from public.slot_beschikbaarheid

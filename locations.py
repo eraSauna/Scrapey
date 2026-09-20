@@ -1,47 +1,43 @@
-# Kuuma-locaties: Bookeo account/type + metadata voor scraper en Google Sheet.
-# a = Bookeo-account, type = product-id per locatie (uit de paginabron gehaald).
-import datetime
+"""Stabiele Kuuma-locatiecodes voor historische continuïteit.
 
-START = datetime.date(2026, 7, 23)   # eerste dag in de sheet
+Capaciteit, prijs en tijdsloten komen live uit Periode. Deze lijst koppelt de
+Periode-identiteit aan de bestaande keys in Supabase. Toekomstige onbekende
+sauna's krijgen automatisch een key in ``periode.py``.
+"""
 
 LOCATIONS = [
-    dict(key="ams-bjork", naam="Ams Björk", slug="marineterrein-bjork",
-         a="3254A3FXXU175D69E71C5", type="3254PATUWN17B8204191E", maxdrop=6, prijs=17.50,
-         eind=datetime.date(2027, 4, 30), we_only=[],
-         slots=["07:00","08:30","10:00","11:30","13:00","14:30","16:30","18:00","19:30","21:00","22:30"]),
-    dict(key="ams-matsu", naam="Ams Matsu", slug="marineterrein-matsu",
-         a="3254A3FXXU175D69E71C5", type="3254X4FRFA191E02B7FD6", maxdrop=8, prijs=17.50,
-         eind=datetime.date(2027, 4, 30), we_only=[],
-         slots=["06:30","08:00","09:30","11:00","12:30","14:00","16:00","17:30","19:00","20:30","22:00"]),
-    dict(key="ams-noord", naam="Ams Noord", slug="boek-sauna-amsterdam-noord",
-         a="3254A3FXXU175D69E71C5", type="325467EJPF183698FB466", maxdrop=6, prijs=17.50,
-         eind=datetime.date(2026, 12, 31), we_only=["22:45"],
-         slots=["07:00","08:30","10:00","11:30","13:00","15:15","16:45","18:15","19:45","21:15","22:45"]),
-    dict(key="den-bosch", naam="Den Bosch", slug="kuuma-den-bosch",
-         a="32547XC6XX191747C1FE3", type="32549FJM9P199F2A9FD38", maxdrop=7, prijs=17.50,
-         eind=datetime.date(2026, 12, 31), we_only=[],
-         slots=["07:00","08:30","10:45","12:15","13:45","15:15","16:45","18:15","19:45","21:15"]),
-    dict(key="egmond", naam="Egmond aan Zee", slug="boek-sauna-egmond-aan-zee",
-         a="3254EHPF3N198F61DFBD6", type="3254XHH93619E97C3F863", maxdrop=10, prijs=17.50,
-         eind=datetime.date(2026, 12, 31), we_only=[],
-         slots=["07:00","08:30","10:30","12:00","13:30","15:00","17:00","18:30","20:00","21:30"]),
-    dict(key="kallumaan", naam="Kallumaan", slug="drop-in-kallumaan",
-         a="3254A3FXXU175D69E71C5", type="32546LKUKL1878F1D6984", maxdrop=7, prijs=15.00,
-         eind=datetime.date(2026, 9, 30), we_only=[],
-         slots=["07:00","09:15","11:30","13:45","16:00","18:15","20:30"]),
-    dict(key="nijmegen-lent", naam="Nijmegen Lent", slug="boek-sauna-nijmegen-lent",
-         a="32547XC6XX191747C1FE3", type="3254MAC9XU19174D5D1AC", maxdrop=6, prijs=17.50,
-         eind=datetime.date(2026, 7, 31), we_only=[],
-         slots=["07:00","08:30","10:00","11:30","13:00","14:30","16:00","17:30","19:00","20:30","22:00"]),
-    dict(key="nijmegen-nyma", naam="Nijmegen Nyma", slug="kuuma-nyma",
-         a="32547XC6XX191747C1FE3", type="32547WAWX619817809442", maxdrop=7, prijs=17.50,
-         eind=datetime.date(2026, 11, 1), we_only=[],
-         slots=["07:00","08:30","10:00","11:30","13:00","14:30","16:00","17:30","19:00","20:30"]),
-    dict(key="rotterdam-delfshaven", naam="Rotterdam Delfshaven", slug="boek-sauna-rotterdam-delfshaven",
-         a="32547XC6XX191747C1FE3", type="3254WA9ELT19600DB8361", maxdrop=6, prijs=17.50,
-         eind=datetime.date(2027, 4, 30), we_only=[],
-         slots=["07:00","08:30","10:00","11:30","13:00","14:30","16:00","17:30","19:00","20:30","22:00"]),
+    dict(key="ams-bjork", naam="Ams Björk", periode_location_id="amsterdam-marineterrein",
+         periode_sauna_name="Björk", periode_service_id="uDw4a2pDUAyQ3XXonN2o"),
+    dict(key="ams-matsu", naam="Ams Matsu", periode_location_id="amsterdam-marineterrein",
+         periode_sauna_name="Matsu", periode_service_id="G7yzdhmpEiaM1yWCPCc0"),
+    dict(key="ams-noord", naam="Ams Noord", periode_location_id="amsterdam-noord",
+         periode_sauna_name="Amsterdam Noord", periode_service_id="ZKtSDPE2CNDgrjRi39ZM"),
+    dict(key="den-bosch", naam="Den Bosch", periode_location_id="den-bosch",
+         periode_sauna_name="Den Bosch", periode_service_id="2KC4CrIgY5Twam05fjEr"),
+    dict(key="egmond", naam="Egmond aan Zee", periode_location_id="egmond-aan-zee",
+         periode_sauna_name="Egmond aan Zee", periode_service_id="cSiOCBqe8ETkZgvyTmIl"),
+    dict(key="kallumaan", naam="Kallumaan", periode_location_id="kallumaan",
+         periode_sauna_name="Kallumaan", periode_service_id="TzAhXeq4O9FKYJwZS02s"),
+    dict(key="nijmegen-lent", naam="Nijmegen Lent", periode_location_id="nijmegen-lent",
+         periode_sauna_name="Nijmegen Lent", periode_service_id="JggN0BBfFl24F3WRHeRn"),
+    dict(key="nijmegen-nyma", naam="Nijmegen Nyma", periode_location_id="nijmegen-nyma",
+         periode_sauna_name="Nijmegen NYMA", periode_service_id="Bu9WNfv2cyfImPufbULw"),
+    dict(key="rotterdam-delfshaven", naam="Rotterdam Delfshaven",
+         periode_location_id="rotterdam-delfshaven", periode_sauna_name="Rotterdam Delfshaven",
+         periode_service_id="Pqc1jrrRSP3gIe1Vxn6R"),
+    dict(key="amsterdam-aan-t-ij", naam="Amsterdam Aan 't IJ",
+         periode_location_id="amsterdam-aan-t-ij", periode_sauna_name="Amsterdam Aan 't IJ",
+         periode_service_id="7fC6AcqCG9i1q9sYLExl"),
 ]
 
+BY_SERVICE_ID = {loc["periode_service_id"]: loc for loc in LOCATIONS}
+BY_LOCATION_AND_NAME = {
+    (loc["periode_location_id"], loc["periode_sauna_name"].casefold()): loc
+    for loc in LOCATIONS
+}
+
+
 def page_url(loc):
-    return f"https://kuuma.nl/boek-nu/{loc['slug']}/"
+    """Compatibiliteit voor de bewaarde Bookeo-module die Billies helpers levert."""
+    slug = loc.get("slug") or loc.get("periode_location_id") or loc["key"]
+    return f"https://kuuma.nl/boek-nu/{slug}/"

@@ -1,22 +1,26 @@
 # Kuuma bezetting-scraper
 
-Leest 2× per dag (04:00 en 15:00 Amsterdam) per locatie de Bookeo-widget uit — het
-aantal **beschikbare plekken** per tijdslot — en schrijft dat naar **Supabase**.
+Leest 2× per dag (04:00 en 15:00 Amsterdam) het publieke Kuuma/Periode-overzicht uit —
+het aantal **beschikbare plekken** per tijdslot — en schrijft dat naar **Supabase**.
 Reserveringen, bezetting % en omzet worden berekend in een SQL-view
 (reserveringen = max personen − beschikbaar).
+
+Kuuma gebruikt geen browser of proxy meer: één lichte JSON-call levert alle actieve
+sauna's. Capaciteit, prijs en slots komen live mee. Bekende locaties behouden hun
+historische database-key; een nieuw actieve Periode-locatie wordt automatisch aan
+`locaties` toegevoegd en verschijnt via dezelfde views in het dashboard.
 
 Daarnaast volgt `billies.py` op dezelfde meetmomenten uitsluitend **Big Billies -
 Zandvoort**. Morning Mini Steam en The Barrel worden bewust niet meegenomen. De ruwe
 metingen staan in `billies_beschikbaarheid`; `billies_dag` en `billies_slot` leveren
 de samenvattingen voor de aparte dashboardpagina.
 
-Draait op GitHub Actions (gratis) via een **residentiële proxy** (Bookeo blokkeert
-datacenter/geflagde IP's) en in een **headed** browser onder xvfb (Bookeo blokkeert
-headless browsers met een "session inactive"-fout).
+Big Billies en de Saunaboot gebruiken nog wel hun eigen Bookeo/browser-proces en
+residentiële proxy. De workflows zijn volledig van elkaar gescheiden.
 
 ## Wat jij moet aanmaken
 
-### 1. Residentiële proxy → secret `PROXY_URL`
+### 1. Residentiële proxy → secret `PROXY_URL` (alleen Billies/Saunaboot)
 - Neem een **residentiële** proxy (géén datacenter): bv. IPRoyal.
 - Pay-as-you-go of klein pakket; ons verbruik is ~5–10 MB/dag.
 - Vorm: `http://GEBRUIKER:WACHTWOORD@HOST:POORT` — de kale creds volstaan.
@@ -51,16 +55,18 @@ headless browsers met een "session inactive"-fout).
   - View `bezetting_totaal` (alles samen per dag)
 - Bij problemen laadt de run een artifact `debug/` met de ruwe widget-tekst per locatie.
 
-## Lokaal testen (op je laptop, met proxy)
+## Kuuma lokaal testen (geen proxy of packages nodig)
 ```bash
-python3 -m venv venv && ./venv/bin/pip install -r requirements.txt
-./venv/bin/python -m playwright install chromium
 # zonder SUPABASE_* -> print resultaat als JSON i.p.v. schrijven
-PROXY_URL="http://user:pass@host:poort" DEBUG=1 ONLY=ams-bjork ./venv/bin/python scrape.py
+ONLY=ams-bjork python3 periode.py
+# compacte controle van alle locaties
+SUMMARY_ONLY=1 python3 periode.py
+# unit-tests
+python3 -m unittest -v test_periode.py
 ```
 
 ## Zomer-/wintertijd
-Cron staat op 02:00 / 10:00 / 15:00 UTC (= 04:00 / 12:00 / 17:00 zomertijd). Het meetmoment-label
+Kuuma-cron staat op 02:00 / 13:00 UTC (= 04:00 / 15:00 zomertijd). Het meetmoment-label
 (ochtend/middag/avond) wordt bepaald op wélke cron triggerde (`github.event.schedule`), dus een
 late start verschuift het label niet. Datum + tijdstempel zijn altijd Amsterdam-tijd. In de winter
 schuift het run-moment 1 uur; wil je dat exact houden, zet de crons dan een uur op.
@@ -70,18 +76,20 @@ Als je in healthchecks een cron-schema gebruikt: `0 4,12,17 * * *`, timezone Eur
 grace 2 uur (GitHub-cron kan flink later starten — ruime grace voorkomt vals alarm).
 
 ## Bestanden
-- `scrape.py` — hoofdscript (proxy, widget uitlezen, media blokkeren om data te sparen)
+- `periode.py` — actieve Kuuma-scraper (Periode-config, JSON-validatie, nieuwe locaties)
+- `scrape.py` — bewaarde oude Bookeo-scraper; wordt niet meer door de workflow gebruikt
 - `supa.py` — upsert naar Supabase (alleen stdlib)
 - `schema.sql` — tabel + views (eenmalig in Supabase draaien)
-- `locations.py` — 9 locaties met Bookeo-id's, tijdslots, prijs, capaciteit
+- `locations.py` — stabiele koppeling voor bestaande keys + Amsterdam Aan 't IJ
 - `.github/workflows/scrape.yml` — de 2×/dag cron
 - `billies.py` / `billies_supa.py` — Big Billies-widget en Supabase-upsert
 - `billies_schema.sql` — afgeschermde Big Billies-tabel + dashboardviews
 - `.github/workflows/billies.yml` — Big Billies ochtend- en middagmeting
 
 ## Werking (gevalideerd)
-- Getest via een NL residentiële proxy: alle 3 de Bookeo-accounts leveren correcte slots.
-- Bookeo toont per pagina de **huidige dag**; de 03:00-run vangt de volledige dag, de
-  12:00-run werkt de nog-open slots bij (upsert overschrijft alleen wat opnieuw gemeten is).
-- Per locatie 1 automatische retry bij een transiënte hapering; volgorde en pauzes zijn
-  gerandomiseerd (menselijk gedrag).
+- Periode levert alle actieve Kuuma-sauna's en drop-in-slots in één response.
+- De nonce wordt bij iedere run opnieuw van de Kuuma-pagina gelezen en nooit hardcoded.
+- Onmogelijke waarden, dubbele slots, een verkeerde datum of lege actieve sauna laten de
+  workflow bewust falen; tijdelijke netwerkfouten krijgen drie begrensde pogingen.
+- De ochtendrun legt `beschikbaar_ochtend` vast; de middagrun ververst `beschikbaar`
+  zonder de ochtendstand te wissen.
