@@ -1,10 +1,11 @@
 import datetime
+import json
 import os
 import unittest
 from unittest.mock import patch
 
 from periode import extract_periode_config, parse_results
-from supa import build_location_rows, build_rows, write_results
+from supa import build_location_rows, build_rows, verify_results, write_results
 
 
 class PeriodeTest(unittest.TestCase):
@@ -75,8 +76,9 @@ class PeriodeTest(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, "buiten bereik"):
             parse_results(data)
 
+    @patch("supa.verify_results")
     @patch("supa._upsert")
-    def test_location_is_upserted_before_slots(self, upsert):
+    def test_location_is_upserted_before_slots(self, upsert, verify):
         result = {
             "key": "amsterdam-aan-t-ij", "naam": "Amsterdam Aan 't IJ",
             "capacity": 6, "price": 18.5, "slug": "boek-sauna-amsterdam-aan-t-ij",
@@ -90,6 +92,19 @@ class PeriodeTest(unittest.TestCase):
         self.assertEqual(upsert.call_args_list[0].args[2], "locaties")
         self.assertEqual(upsert.call_args_list[1].args[2], "slot_beschikbaarheid")
         self.assertEqual(upsert.call_args_list[1].args[3][0]["beschikbaar_ochtend"], 5)
+        verify.assert_called_once()
+
+    @patch("supa.urllib.request.urlopen")
+    def test_read_back_detects_all_expected_slots(self, urlopen):
+        response = urlopen.return_value.__enter__.return_value
+        response.read.return_value = json.dumps([
+            {"location_key": "amsterdam-aan-t-ij", "slot_time": "07:00"}
+        ]).encode()
+        result = {
+            "key": "amsterdam-aan-t-ij", "error": None,
+            "slots": [{"time": "07:00", "available": 5, "price": 18.5}],
+        }
+        verify_results("https://example.supabase.co", "secret", [result], datetime.date(2026, 9, 21))
 
 
 if __name__ == "__main__":

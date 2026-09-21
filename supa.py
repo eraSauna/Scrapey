@@ -1,9 +1,9 @@
-"""Supabase-writer voor Kuuma-slotmetingen.
+"""Supabase-writer en read-back-verificatie voor Kuuma-slotmetingen.
 
 De actuele locatiemetadata wordt eerst ge-upsert. Daardoor werken nieuwe
 Periode-locaties direct met de bestaande foreign key en dashboardviews.
 """
-import os, json, urllib.request, urllib.error
+import os, json, urllib.parse, urllib.request, urllib.error
 
 
 def build_rows(results, target, run_label):
@@ -75,6 +75,43 @@ def _upsert(url, key, table, rows, on_conflict):
         raise RuntimeError(f"Supabase {table} HTTP {exc.code}: {detail}") from None
 
 
+def verify_results(url, key, results, target):
+    expected = {
+        (result["key"], slot["time"])
+        for result in results if not result.get("error")
+        for slot in result.get("slots", [])
+    }
+    location_keys = sorted({location_key for location_key, _ in expected})
+    if not expected:
+        raise RuntimeError("Supabase-verificatie heeft geen verwachte slots")
+    quoted_keys = ",".join(f'"{value}"' for value in location_keys)
+    query = urllib.parse.urlencode({
+        "select": "location_key,slot_time",
+        "datum": f"eq.{target.isoformat()}",
+        "location_key": f"in.({quoted_keys})",
+        "limit": "1000",
+    })
+    request = urllib.request.Request(
+        f"{url}/rest/v1/slot_beschikbaarheid?{query}",
+        headers={"apikey": key, "Authorization": f"Bearer {key}"},
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=30) as response:
+            stored_rows = json.loads(response.read())
+    except urllib.error.HTTPError as exc:
+        detail = exc.read().decode(errors="replace")[:500]
+        raise RuntimeError(f"Supabase read-back HTTP {exc.code}: {detail}") from None
+    stored = {(row["location_key"], row["slot_time"]) for row in stored_rows}
+    missing = sorted(expected - stored)
+    if missing:
+        preview = ", ".join(f"{loc}/{slot}" for loc, slot in missing[:10])
+        raise RuntimeError(f"Supabase read-back mist {len(missing)} slots: {preview}")
+    print(
+        f"Supabase verificatie OK: {len(expected)} slots, "
+        f"{len(location_keys)} locaties (inclusief nieuwe locaties)"
+    )
+
+
 def write_results(results, target, run_label):
     url = os.environ["SUPABASE_URL"].rstrip("/")
     key = os.environ["SUPABASE_KEY"]
@@ -88,3 +125,4 @@ def write_results(results, target, run_label):
         url, key, "slot_beschikbaarheid", rows,
         "location_key,datum,slot_time",
     )
+    verify_results(url, key, results, target)

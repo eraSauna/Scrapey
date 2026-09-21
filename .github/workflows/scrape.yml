@@ -2,6 +2,15 @@ name: Kuuma bezetting scraper
 
 on:
   workflow_dispatch:        # handmatig starten (voor testen)
+  # Tijdelijk voor één expliciet goedgekeurde end-to-end-productietest.
+  push:
+    branches: [main]
+    paths:
+      - "periode.py"
+      - "locations.py"
+      - "supa.py"
+      - "test_periode.py"
+      - ".github/workflows/scrape.yml"
   schedule:
     # GitHub-cron draait in UTC (zomertijd): 02:00=04:00, 13:00=15:00 Amsterdam.
     # Ochtend bewust vroeg (04:00) zodat 'ie ook mét cron-vertraging vóór het eerste slot draait
